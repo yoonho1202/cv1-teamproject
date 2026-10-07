@@ -1,10 +1,63 @@
-# 동물 사진 중복 검출
+# 동물 사진 중복·유사 사진 검출
 
 동일한 사진과 크기만 바뀐 사진을 찾는 Python 도구입니다. 같은 동물의 다른
 자세·방향·촬영 각도, 좌우 반전, 회전, 잘린 사진은 별도 사진으로 취급합니다.
 사진을 삭제하거나 이동하지 않고 결과만 CSV로 저장합니다.
 
-## 실행
+서로 다른 촬영 사진이라도 같은 동물·비슷한 포즈·비슷한 배경이면 겹치는
+후보로 검토하고 싶을 때는 아래 **유사 사진 검사**를 사용하세요.
+
+## 유사 사진 검사 (Windows CMD)
+
+`find_similar_images.py`는 사전학습된 ResNet50 이미지 특징을 비교해 비슷한 사진
+쌍을 점수순으로 찾습니다. 전체 화면과 중앙 정사각형 영역을 따로 비교하고,
+전체 유사도 40% + 중앙 유사도 60%로 후보를 정렬합니다. 이미지당 최대 5개의
+이웃 후보를 양방향으로 찾으며, 후보들을 자동으로 하나의 중복 그룹으로 합치지
+않습니다. 기본 최소 유사도는 0.90입니다.
+
+코드 폴더의 CMD에서, 기존 `.venv`를 사용하세요. 없으면 먼저 생성합니다.
+
+```cmd
+python -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m pip install torch==2.9.1 torchvision==0.24.1 --index-url https://download.pytorch.org/whl/cpu
+.venv\Scripts\python -m pip check
+.venv\Scripts\python find_similar_images.py "C:\Users\yoonh\OneDrive\바탕 화면\train" --threshold 0.90 -o similar_results
+start "" "similar_results\index.html"
+```
+
+처음 실행할 때 공식 PyTorch 서버에서 약 98MB의 모델을 다운로드합니다.
+다운로드의 SHA256 검증을 유지하며, 저장된 모델은 다음 실행에서 재사용합니다.
+CPU만으로 실행할 수 있고 GPU·비밀키가 필요하지 않습니다. 모델에는 사진을
+업로드하지 않습니다. 입력 사진은 이 PC에서 처리합니다.
+
+- `similar_results/index.html`: 두 사진을 나란히 확인하는 보고서. 파일명 `613`
+  등으로 검색하거나 표시할 최소 유사도를 높일 수 있습니다.
+- `similar_results/similar_photos.csv`: 후보 파일 경로, 전체·중앙 유사도와 종합 점수.
+- 결과 폴더가 이미 있으면 덮어쓰지 않습니다. 재실행은 `-o similar_results2`처럼
+  새 폴더를 지정하세요.
+
+후보가 부족하면 `--threshold 0.85`로 낮춰 다시 검사하세요. 더 많은 이웃을
+보려면 `--top-k 10`을 추가할 수 있습니다. HTML에서 기준을 낮춰도 최초 검사에서
+제외된 후보가 추가되지는 않으므로 이 경우에는 명령을 다시 실행해야 합니다.
+
+이 도구는 **유사 사진 검토 후보**를 찾습니다. 같은 품종의 다른 개체나 다른
+포즈도 높은 점수를 받을 수 있고, 배경이 같은 것만으로 점수가 높아질 수도
+있습니다. 반대로 비슷한 사진이 기준 아래로 떨어질 수도 있습니다. 모델 점수는
+동일한 개체·포즈를 보장하는 확률이 아니므로 최종 판단은 두 사진을 보고 하세요.
+CSV의 `match_kind`는 `near_duplicate_candidate`이며 원본 사진은 변경하지 않습니다.
+
+macOS/Linux에서는 가상환경 활성화 후 같은 Python 명령을 사용합니다.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m pip install torch==2.9.1 torchvision==0.24.1 --index-url https://download.pytorch.org/whl/cpu
+python find_similar_images.py /사진/폴더 --threshold 0.90 -o similar_results
+```
+
+## 정확한 중복 검사
 
 Python 3.11 이상이 필요합니다. 클라우드 환경은 Python 3.12로 검증했습니다.
 
@@ -61,5 +114,8 @@ pHash는 비교 후보를 추리는 데만 사용합니다. 후보는 종횡비,
 python -m unittest discover -s tests -v
 ```
 
-원본 사진 720장은 아직 이 저장소에 없습니다. 테스트는 생성한 이미지로
-파일 복사, 서로 다른 저장 형식, 확대·축소, JPEG 재압축 및 다른 사진을 검증합니다.
+사용자의 원본 730장과 613/639번 파일은 이 실행 환경에 없습니다. 기본 테스트는
+생성한 이미지로 정확한 중복 검사와 유사도 후보 선택·보고서 출력을 검증합니다.
+유사 사진 도구는 별도의 공개 동물 사진과 크롭·밝기 변경·무관한 이미지로
+실제 사전학습 모델 실행과 CSV/HTML 생성을 검증했습니다. 사용자 데이터에서
+적절한 유사도 기준과 개체·포즈 구분은 직접 확인해야 합니다.

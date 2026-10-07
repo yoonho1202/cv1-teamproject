@@ -1,0 +1,4 @@
+-r requirements.txt
+# For CPU wheels, install torch/torchvision with the official CPU index as in README.
+torch==2.9.1
+torchvision==0.24.1
