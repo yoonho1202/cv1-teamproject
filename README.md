@@ -145,6 +145,28 @@ pHash는 비교 후보를 추리는 데만 사용합니다. 후보는 종횡비,
 세밀한 질감을 NEAREST 등으로 강하게 축소해 pHash가 크게 달라진 사진도
 후보 추출 단계에서 누락될 수 있습니다.
 
+## 팀원에게 웹 링크로 보고서 공유하기
+
+첨부받은 실제 결과를 `docs/share/`에 웹 공유용으로 준비했습니다.
+train 내부 보고서는 9쌍, train과 test·val 사이 보고서는 18쌍입니다.
+사진 썸네일과 유사도·파일명·세트 구분은 유지하고 개인 PC의 전체 경로는 제거했습니다.
+이 파일들은 업로드한 결과의 스냅샷이며, 검사를 다시 실행해도 자동 갱신되지 않습니다.
+
+저장소의 [GitHub Pages 설정](https://github.com/yoonho1202/cv1-teamproject/settings/pages)에서
+**Source → Deploy from a branch**, **Branch → main**, **폴더 → /docs**를 선택하고
+**Save**를 누르면 준비한 보고서를 웹에 게시할 수 있습니다.
+이미 다른 사이트를 게시 중이면 기존 Pages 설정을 확인한 뒤 변경하세요.
+배포가 완료된 뒤 아래 주소가 열리는지 확인하고 공유하세요.
+
+- 전체 보고서: https://yoonho1202.github.io/cv1-teamproject/share/
+- train 내부: https://yoonho1202.github.io/cv1-teamproject/share/train.html
+- train 대 test·val: https://yoonho1202.github.io/cv1-teamproject/share/split.html
+
+`file:///D:/.../index.html` 주소는 해당 PC의 파일 위치이므로 팀원의 PC에서는
+열리지 않습니다. 위 웹 보고서는 설치 없이 브라우저로 볼 수 있으며,
+검색과 최소 유사도 필터를 사용할 수 있습니다. 공개된 보고서의 사진은
+링크를 가진 사람이 볼 수 있습니다.
+
 ## 검증
 
 ```bash
