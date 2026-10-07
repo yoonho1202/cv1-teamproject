@@ -1,25 +1,104 @@
-# 동물 사진 중복·유사 사진 검출
+# 동물 사진 중복·유사 사진 검사
 
-동일한 사진과 크기만 바뀐 사진을 찾는 Python 도구입니다. 같은 동물의 다른
-자세·방향·촬영 각도, 좌우 반전, 회전, 잘린 사진은 별도 사진으로 취급합니다.
-사진을 삭제하거나 이동하지 않고 결과만 CSV로 저장합니다.
+동물 사진의 **train 내부 유사도**와 **train과 val·test 사이의 유사도**를
+검사하는 Python 도구입니다. 같은 동물·비슷한 포즈·비슷한 배경으로 보이는
+사진 쌍을 찾아 사람이 나란히 비교할 수 있는 HTML 보고서를 만듭니다.
+완전히 동일한 사진과 크기만 바뀐 중복 사진을 찾는 별도 검사도 제공합니다.
+모든 검사는 결과만 저장하며 원본 사진을 삭제하거나 이동하지 않습니다.
 
-서로 다른 촬영 사진이라도 같은 동물·비슷한 포즈·비슷한 배경이면 겹치는
-후보로 검토하고 싶을 때는 아래 **유사 사진 검사**를 사용하세요.
+## 파일 역할과 공유할 파일
 
-## train과 test·val 사이의 겹침 검사
+| 파일 | 역할 |
+| --- | --- |
+| `find_similar_images.py` | 한 사진 폴더 내부의 유사 사진 비교. train 내부 검사에 사용 |
+| `find_split_overlap.py` | train과 test·val 사이의 유사 사진 비교 |
+| `find_duplicate_images.py` | 동일 사진·크기 변경 중복 검사 및 다른 두 코드가 사용하는 공통 이미지 처리 기능 |
+| `requirements.txt` | 공통 패키지 NumPy·Pillow 설치 목록 |
+| `requirements-similarity.txt` | 유사도 모델용 torch·torchvision과 공통 패키지 설치 목록 |
+
+코드를 공유할 때는 **위의 5개 파일을 모두 같은 폴더에 넣어 보내세요.**
+`find_similar_images.py`와 `find_split_overlap.py`도
+`find_duplicate_images.py`를 불러오므로 이 파일을 빼면 실행되지 않습니다.
+`README.md`도 함께 보내면 받은 사람이 아래 설치·실행 방법을 확인할 수 있습니다.
+
+사진 폴더는 코드 폴더에 복사할 필요 없이, 각자의 PC에 있는 경로를 지정합니다.
+train·test·val은 별도 폴더로 유지하세요. 검사를 다시 실행하면 결과 폴더도
+새 이름으로 지정해야 합니다.
+
+## 처음 사용하는 사람: 설치 (Windows CMD)
+
+**Python 3.11 이상**이 필요합니다. 아래 명령은 코드 파일 5개가 있는 폴더의
+CMD에서 실행하세요. 파일 탐색기에서 그 폴더를 열고 주소창에 `cmd`를 입력한
+뒤 Enter를 누르면 해당 폴더에서 CMD가 열립니다.
+
+기존 `.venv`가 있으면 그대로 사용할 수 있습니다. 처음 사용하는 사람은
+가상환경을 생성하고 필요한 패키지를 설치하세요.
+
+```cmd
+python -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m pip install torch==2.9.1 torchvision==0.24.1 --index-url https://download.pytorch.org/whl/cpu
+.venv\Scripts\python -m pip install -r requirements-similarity.txt
+.venv\Scripts\python -m pip check
+```
+
+CPU용 PyTorch를 먼저 설치하고 전체 설치 목록을 확인하는 순서입니다.
+가상환경을 사용하므로 PC에 이미 설치된 NumPy·OpenCV와의 충돌을 피할 수 있습니다.
+설치가 완료되면 같은 CMD에서 아래 1번 또는 2번 검사를 실행하세요.
+
+처음 유사도 검사를 실행할 때 공식 PyTorch 서버에서 약 98MB의 모델을
+다운로드하므로 인터넷 연결이 필요합니다. 다운로드의 SHA256 검증을 유지하며,
+저장된 모델은 다음 실행에서 재사용합니다. CPU만으로 실행할 수 있고
+GPU·비밀키가 필요하지 않습니다. 사진은 이 PC에서 처리하며 모델 서버에
+업로드하지 않습니다.
+
+## 1. train 내부 유사도 비교
+
+`find_similar_images.py`는 사전학습된 ResNet50 이미지 특징을 비교해 비슷한 사진
+쌍을 점수순으로 찾습니다. 전체 화면과 중앙 정사각형 영역을 따로 비교하고,
+전체 유사도 40% + 중앙 유사도 60%로 후보를 정렬합니다. 이미지당 최대 5개의
+이웃 후보를 양방향으로 찾습니다. 다른 사진에서 선택한 쌍도 포함하므로 최종
+보고서에서는 한 사진이 5개보다 많은 쌍에 등장할 수 있습니다. 후보들을 자동으로
+하나의 중복 그룹으로 합치지 않습니다. 기본 최소 유사도는 0.90입니다.
+
+위 설치를 마친 뒤 아래 명령을 실행하세요. 예시 사진 경로는 공유받은 사람의
+**실제 train 폴더 경로**로 바꾸고, 공백이 있어도 인식되도록 큰따옴표를 유지하세요.
+이 예시는 최소 유사도 0.85로 후보를 찾습니다.
+
+```cmd
+.venv\Scripts\python find_similar_images.py "C:\animal_photos\train" --threshold 0.85 -o similar_results
+start "" "similar_results\index.html"
+```
+
+- `similar_results/index.html`: 두 사진을 나란히 확인하는 보고서. 파일명 `613`
+  등으로 검색하거나 표시할 최소 유사도를 높일 수 있습니다.
+- `similar_results/similar_photos.csv`: 후보 파일 경로, 전체·중앙 유사도와 종합 점수.
+- 결과 폴더가 이미 있으면 덮어쓰지 않습니다. 재실행은 `-o similar_results2`처럼
+  새 폴더를 지정하세요.
+
+후보가 부족하면 `--threshold 0.85`로 낮춰 다시 검사하세요. 더 많은 이웃을
+보려면 `--top-k 10`을 추가할 수 있습니다. HTML에서 기준을 낮춰도 최초 검사에서
+제외된 후보가 추가되지는 않으므로 이 경우에는 명령을 다시 실행해야 합니다.
+
+이 도구는 **유사 사진 검토 후보**를 찾습니다. 같은 품종의 다른 개체나 다른
+포즈도 높은 점수를 받을 수 있고, 배경이 같은 것만으로 점수가 높아질 수도
+있습니다. 반대로 비슷한 사진이 기준 아래로 떨어질 수도 있습니다. 모델 점수는
+동일한 개체·포즈를 보장하는 확률이 아니므로 최종 판단은 두 사진을 보고 하세요.
+CSV의 `match_kind`는 `near_duplicate_candidate`이며 원본 사진은 변경하지 않습니다.
+
+## 2. train과 val·test 사이의 유사도 비교
 
 `find_split_overlap.py`는 **train × (test + val)**만 비교합니다. 세 폴더는
 각각 분리해서 유지하고, `test`나 `val`을 `train` 안에 넣지 마세요.
 같은 세트 내부의 유사 사진은 이 보고서에 포함하지 않습니다. train 쪽 사진만
 제거 검토 대상으로 표시하고 test·val 사진은 비교 기준으로 유지합니다.
 
-기존 유사 사진 검사의 `.venv`와 설치된 모델을 그대로 사용합니다. 최신
-`find_split_overlap.py`, `find_similar_images.py`, `find_duplicate_images.py`가
-같은 코드 폴더에 있어야 합니다. CMD 실행 예:
+위에서 설치한 `.venv`와 모델을 그대로 사용합니다. 예시의 세 사진 경로를
+각자의 실제 train·test·val 폴더 경로로 바꿔 실행하세요. 각각의 경로를
+큰따옴표로 감싸세요. CMD 실행 예:
 
 ```cmd
-.venv\Scripts\python find_split_overlap.py --train "C:\Users\yoonh\OneDrive\바탕 화면\train" --test "C:\Users\yoonh\OneDrive\바탕 화면\test" --val "C:\Users\yoonh\OneDrive\바탕 화면\val" --threshold 0.85 -o split_overlap_results
+.venv\Scripts\python find_split_overlap.py --train "C:\animal_photos\train" --test "C:\animal_photos\test" --val "C:\animal_photos\val" --threshold 0.85 -o split_overlap_results
 start "" "split_overlap_results\index.html"
 ```
 
@@ -44,57 +123,29 @@ start "" "split_overlap_results\index.html"
 새 결과 폴더를 지정합니다. 손상된 파일이 있으면 읽은 사진의 보고서를 만들더라도
 종료 코드 2와 오류를 표시하므로 전체 검사 성공으로 간주하지 마세요.
 
-## 유사 사진 검사 (Windows CMD)
+## macOS/Linux에서 유사도 검사하기
 
-`find_similar_images.py`는 사전학습된 ResNet50 이미지 특징을 비교해 비슷한 사진
-쌍을 점수순으로 찾습니다. 전체 화면과 중앙 정사각형 영역을 따로 비교하고,
-전체 유사도 40% + 중앙 유사도 60%로 후보를 정렬합니다. 이미지당 최대 5개의
-이웃 후보를 양방향으로 찾으며, 후보들을 자동으로 하나의 중복 그룹으로 합치지
-않습니다. 기본 최소 유사도는 0.90입니다.
-
-코드 폴더의 CMD에서, 기존 `.venv`를 사용하세요. 없으면 먼저 생성합니다.
-
-```cmd
-python -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
-.venv\Scripts\python -m pip install torch==2.9.1 torchvision==0.24.1 --index-url https://download.pytorch.org/whl/cpu
-.venv\Scripts\python -m pip check
-.venv\Scripts\python find_similar_images.py "C:\Users\yoonh\OneDrive\바탕 화면\train" --threshold 0.90 -o similar_results
-start "" "similar_results\index.html"
-```
-
-처음 실행할 때 공식 PyTorch 서버에서 약 98MB의 모델을 다운로드합니다.
-다운로드의 SHA256 검증을 유지하며, 저장된 모델은 다음 실행에서 재사용합니다.
-CPU만으로 실행할 수 있고 GPU·비밀키가 필요하지 않습니다. 모델에는 사진을
-업로드하지 않습니다. 입력 사진은 이 PC에서 처리합니다.
-
-- `similar_results/index.html`: 두 사진을 나란히 확인하는 보고서. 파일명 `613`
-  등으로 검색하거나 표시할 최소 유사도를 높일 수 있습니다.
-- `similar_results/similar_photos.csv`: 후보 파일 경로, 전체·중앙 유사도와 종합 점수.
-- 결과 폴더가 이미 있으면 덮어쓰지 않습니다. 재실행은 `-o similar_results2`처럼
-  새 폴더를 지정하세요.
-
-후보가 부족하면 `--threshold 0.85`로 낮춰 다시 검사하세요. 더 많은 이웃을
-보려면 `--top-k 10`을 추가할 수 있습니다. HTML에서 기준을 낮춰도 최초 검사에서
-제외된 후보가 추가되지는 않으므로 이 경우에는 명령을 다시 실행해야 합니다.
-
-이 도구는 **유사 사진 검토 후보**를 찾습니다. 같은 품종의 다른 개체나 다른
-포즈도 높은 점수를 받을 수 있고, 배경이 같은 것만으로 점수가 높아질 수도
-있습니다. 반대로 비슷한 사진이 기준 아래로 떨어질 수도 있습니다. 모델 점수는
-동일한 개체·포즈를 보장하는 확률이 아니므로 최종 판단은 두 사진을 보고 하세요.
-CSV의 `match_kind`는 `near_duplicate_candidate`이며 원본 사진은 변경하지 않습니다.
-
-macOS/Linux에서는 가상환경 활성화 후 같은 Python 명령을 사용합니다.
+코드 폴더에서 가상환경을 만들고 설치한 뒤, 실제 사진 폴더 경로를 지정하세요.
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
 python -m pip install torch==2.9.1 torchvision==0.24.1 --index-url https://download.pytorch.org/whl/cpu
-python find_similar_images.py /사진/폴더 --threshold 0.90 -o similar_results
+python -m pip install -r requirements-similarity.txt
+python -m pip check
+python find_similar_images.py /path/to/train --threshold 0.85 -o similar_results
+python find_split_overlap.py --train /path/to/train --test /path/to/test --val /path/to/val --threshold 0.85 -o split_overlap_results
 ```
 
+결과 폴더의 `index.html`을 브라우저에서 여세요. 한 가지만 검사하려면
+마지막 두 명령 중 필요한 것만 실행하면 됩니다.
+
 ## 정확한 중복 검사
+
+`find_duplicate_images.py`는 동일한 사진과 크기만 바뀐 사진을 검사합니다.
+같은 동물의 다른 자세·방향·촬영 각도, 좌우 반전, 회전, 잘린 사진은 이 검사에서
+별도 사진으로 취급합니다. 결과는 CSV로 저장합니다.
 
 Python 3.11 이상이 필요합니다. 클라우드 환경은 Python 3.12로 검증했습니다.
 
@@ -168,6 +219,9 @@ train 내부 보고서는 9쌍, train과 test·val 사이 보고서는 18쌍입�
 링크를 가진 사람이 볼 수 있습니다.
 
 ## 검증
+
+아래 테스트 명령은 **전체 저장소의 `tests/` 폴더까지 받은 개발자용**입니다.
+공유용 파일 5개만 받은 경우에는 위의 설치·검사 명령을 사용하세요.
 
 ```bash
 python -m unittest discover -s tests -v
