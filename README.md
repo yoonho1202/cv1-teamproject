@@ -7,6 +7,43 @@
 서로 다른 촬영 사진이라도 같은 동물·비슷한 포즈·비슷한 배경이면 겹치는
 후보로 검토하고 싶을 때는 아래 **유사 사진 검사**를 사용하세요.
 
+## train과 test·val 사이의 겹침 검사
+
+`find_split_overlap.py`는 **train × (test + val)**만 비교합니다. 세 폴더는
+각각 분리해서 유지하고, `test`나 `val`을 `train` 안에 넣지 마세요.
+같은 세트 내부의 유사 사진은 이 보고서에 포함하지 않습니다. train 쪽 사진만
+제거 검토 대상으로 표시하고 test·val 사진은 비교 기준으로 유지합니다.
+
+기존 유사 사진 검사의 `.venv`와 설치된 모델을 그대로 사용합니다. 최신
+`find_split_overlap.py`, `find_similar_images.py`, `find_duplicate_images.py`가
+같은 코드 폴더에 있어야 합니다. CMD 실행 예:
+
+```cmd
+.venv\Scripts\python find_split_overlap.py --train "C:\Users\yoonh\OneDrive\바탕 화면\train" --test "C:\Users\yoonh\OneDrive\바탕 화면\test" --val "C:\Users\yoonh\OneDrive\바탕 화면\val" --threshold 0.85 -o split_overlap_results
+start "" "split_overlap_results\index.html"
+```
+
+`--test`, `--val` 중 하나만 지정해서 검사할 수도 있습니다. 같은 폴더나
+서로 포함하는 폴더를 세트로 지정하면 오류로 중단합니다. 결과 폴더는 입력
+사진 폴더 밖에 두세요. 폴더 밖의 사진을 가리키는 심볼릭 링크도 거부합니다.
+
+- `index.html`: 왼쪽 **train — 제거 검토 대상**, 오른쪽 **test/val — 유지**.
+  정확한 일치인지 유사 후보인지도 표시합니다.
+- `split_overlaps.csv`: train 사진, 비교 사진, `test`/`val`, 유사도와 판정 근거.
+- `train_candidates.csv`: 제거를 검토할 train 사진의 중복 없는 목록.
+  한 train 사진이 여러 비교 사진과 겹칠 수 있으므로 후보 쌍 수와 train 수는 다릅니다.
+
+기본값은 최소 유사도 0.90이며, 임계값 이상인 **모든 세트 간 쌍**을 기록합니다.
+`--top-k 3`처럼 명시적으로 지정하면 train당 유사 후보 수가 제한됩니다.
+파일·픽셀이 정확히 같은 `exact_file`/`exact_pixels`는 유사도와 후보 수 제한에
+관계없이 모두 포함합니다. `near_duplicate_candidate`는 같은 품종이나 배경만
+비슷해도 나올 수 있으므로 평가 데이터 누수의 확정 판정으로 사용하지 마세요.
+
+사진은 자동 삭제하지 않습니다. 보고서에서 두 사진을 확인한 뒤 제거하기로
+판단한 **train 파일만** 처리하세요. 재검사는 `-o split_overlap_results2`처럼
+새 결과 폴더를 지정합니다. 손상된 파일이 있으면 읽은 사진의 보고서를 만들더라도
+종료 코드 2와 오류를 표시하므로 전체 검사 성공으로 간주하지 마세요.
+
 ## 유사 사진 검사 (Windows CMD)
 
 `find_similar_images.py`는 사전학습된 ResNet50 이미지 특징을 비교해 비슷한 사진

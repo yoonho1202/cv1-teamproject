@@ -4,3 +4,4 @@ __pycache__/
 duplicates*.csv
 .model_cache/
 similar_results*/
+split_overlap_results*/

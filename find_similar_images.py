@@ -116,26 +116,35 @@ def _thumbnail(path: Path) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(output.getvalue()).decode("ascii")
 
 
-def write_results(paths: list[Path], pairs: list[SimilarPair], output_dir: Path) -> None:
+def write_results(paths: list[Path], pairs: list[SimilarPair], output_dir: Path, *,
+                  image_labels: dict[int, str] | None = None,
+                  pair_labels: dict[tuple[int, int], str] | None = None,
+                  title: str = "유사 사진 검토",
+                  guidance: str = "같은 동물·포즈·배경인지 사진을 보고 확인하세요.",
+                  csv_name: str | None = "similar_photos.csv") -> None:
     # Prepare all thumbnails before creating output, so unreadable images fail cleanly.
     if output_dir.exists():
         raise FileExistsError(f"결과 폴더가 이미 있습니다. 새 --output-dir 이름을 지정하세요: {output_dir}")
     used = sorted({index for pair in pairs for index in (pair.left, pair.right)})
     thumbnails = {str(index): _thumbnail(paths[index]) for index in used}
     cards = []
+    labels = image_labels or {}
+    evidence_labels = pair_labels or {}
     for pair in pairs:
         left, right = paths[pair.left], paths[pair.right]
         searchable = html.escape(f"{left} {right}", quote=True)
+        left_label, right_label = html.escape(labels.get(pair.left, "")), html.escape(labels.get(pair.right, ""))
         cards.append(f'''<article data-score="{pair.similarity:.8f}" data-name="{searchable}">
 <p class="score">유사도 {pair.similarity:.3f} · 전체 {pair.global_similarity:.3f} · 중앙 {pair.center_similarity:.3f}</p>
-<div class="photos"><figure><img data-image="{pair.left}" loading="lazy" alt="{html.escape(left.name, quote=True)}"><figcaption>{html.escape(left.name)}<small>{html.escape(str(left))}</small></figcaption></figure>
-<figure><img data-image="{pair.right}" loading="lazy" alt="{html.escape(right.name, quote=True)}"><figcaption>{html.escape(right.name)}<small>{html.escape(str(right))}</small></figcaption></figure></div>
+<p>{html.escape(evidence_labels.get((pair.left, pair.right), ""))}</p>
+<div class="photos"><figure><strong>{left_label}</strong><img data-image="{pair.left}" loading="lazy" alt="{html.escape(left.name, quote=True)}"><figcaption>{html.escape(left.name)}<small>{html.escape(str(left))}</small></figcaption></figure>
+<figure><strong>{right_label}</strong><img data-image="{pair.right}" loading="lazy" alt="{html.escape(right.name, quote=True)}"><figcaption>{html.escape(right.name)}<small>{html.escape(str(right))}</small></figcaption></figure></div>
 </article>''')
     images_json = json.dumps(thumbnails, ensure_ascii=True).replace("<", "\\u003c")
     minimum = float(np.floor(min((pair.similarity for pair in pairs), default=0.0) * 1000) / 1000)
     document = f'''<!doctype html>
 <html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>유사 사진 검토</title>
+<title>{html.escape(title)}</title>
 <style>
 body{{font:16px system-ui,sans-serif;max-width:1050px;margin:24px auto;padding:0 16px;background:#f5f6f8;color:#20242c}}
 header{{position:sticky;top:0;background:#f5f6f8;padding:8px 0;z-index:1}}
@@ -144,8 +153,8 @@ input{{padding:8px;margin:4px 8px 4px 0}}article{{background:white;border:1px so
 img{{width:100%;height:300px;object-fit:contain;background:#eef0f3}}figcaption{{overflow-wrap:anywhere;margin-top:8px}}
 small{{display:block;color:#596474;font-size:12px;margin-top:4px}}
 .score{{font-weight:600}}[hidden]{{display:none}}@media(max-width:550px){{img{{height:210px}}}}
-</style><h1>유사 사진 검토</h1>
-<p>검사 {len(paths)}장 · 후보 {len(pairs)}쌍. 같은 동물·포즈·배경인지 사진을 보고 확인하세요.</p>
+</style><h1>{html.escape(title)}</h1>
+<p>검사 {len(paths)}장 · 후보 {len(pairs)}쌍. {html.escape(guidance)}</p>
 <p>모델 유사도는 확률이나 개체 동일성의 확정 판정이 아닙니다. 사진은 삭제하거나 이동하지 않았습니다.</p>
 <header><label>파일명 검색 <input id="query" placeholder="예: 613"></label>
 <label>최소 유사도 <input id="minimum" type="number" min="-1" max="1" step="0.01" value="{minimum:.3f}"></label>
@@ -167,14 +176,15 @@ document.getElementById('query').addEventListener('input',filter);
 document.getElementById('minimum').addEventListener('input',filter);filter();
 </script></html>'''
     output_dir.mkdir(parents=True, exist_ok=False)
-    with (output_dir / "similar_photos.csv").open("x", newline="", encoding="utf-8-sig") as stream:
-        writer = csv.writer(stream)
-        writer.writerow(["image_a", "image_b", "similarity", "global_similarity",
-                         "center_similarity", "match_kind"])
-        for pair in pairs:
-            writer.writerow([str(paths[pair.left]), str(paths[pair.right]), f"{pair.similarity:.6f}",
-                             f"{pair.global_similarity:.6f}", f"{pair.center_similarity:.6f}",
-                             "near_duplicate_candidate"])
+    if csv_name is not None:
+        with (output_dir / csv_name).open("x", newline="", encoding="utf-8-sig") as stream:
+            writer = csv.writer(stream)
+            writer.writerow(["image_a", "image_b", "similarity", "global_similarity",
+                             "center_similarity", "match_kind"])
+            for pair in pairs:
+                writer.writerow([str(paths[pair.left]), str(paths[pair.right]), f"{pair.similarity:.6f}",
+                                 f"{pair.global_similarity:.6f}", f"{pair.center_similarity:.6f}",
+                                 "near_duplicate_candidate"])
     (output_dir / "index.html").write_text(document, encoding="utf-8")
 
 
